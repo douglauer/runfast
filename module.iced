@@ -24,10 +24,10 @@ module.exports = runfast =
 
     process.stdin.setRawMode yes
     process.stdin.on 'keypress', (ch,key) =>
-      if key.name is 'f5'
-        log "(reloading)".grey
+      if key.name in ['f5','r']
+        log "(reloading)".blue
         @fork()
-      if key.name is 'c' and key.ctrl
+      if key.name is 'c'
         try
           await exec "kill #{@child.pid}", {silent:yes}, defer killed
           process.exit 0
@@ -44,7 +44,7 @@ module.exports = runfast =
     if @file.match '.js' then bin = shelljs.which 'node'
 
     str = "#{bin} #{@file}"
-    log "(#{str})".grey
+    log "(#{str})".blue
 
     @child = exec str, {async:yes}
     @child.on 'exit', =>
@@ -52,8 +52,8 @@ module.exports = runfast =
         @waiting = yes
         await exec "kill #{@child.pid}", {silent:yes}, defer killed
         try
-          exec """afplay /System/Library/Sounds/Basso.aiff""", {async:yes}
-        log "(waiting)".grey
+          exec """play ~/beep.mp3""", {async:yes,silent:yes}
+        log "(waiting)".blue
 
   watch: ->
     _handler = ((event,filename) =>
@@ -93,7 +93,7 @@ module.exports = runfast =
               break
 
     if !cli.length or cli.join(' ').match 'help'
-      log("Usage ./ [file]").grey
+      log("Usage ./ [file]").blue
       process.exit 0
     else
       @init cli.pop()
