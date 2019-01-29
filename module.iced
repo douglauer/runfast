@@ -10,6 +10,8 @@ keypress = require 'keypress'
 shelljs = require 'shelljs'
 exec = shelljs.exec
 
+LAST_FORK = new Date().getTime()
+
 module.exports = runfast =
 
   init: (@file) ->
@@ -29,13 +31,35 @@ module.exports = runfast =
         @fork()
       if key.name is 'c'
         try
-          await exec "kill #{@child.pid}", {silent:yes}, defer killed
+          await exec "kill -9 #{@child.pid}", {silent:yes,async:yes}, defer killed
+          await @kill defer()
           process.exit 0
+
+  kill: (cb) ->
+    await exec "ps aux | grep '#{@file}'", {silent:yes,async:yes}, defer e,r
+    if e then throw e
+
+    pids = []
+
+    for x in r.split '\n'
+      while x.includes('  ')
+        x = x.split('  ').join(' ')
+      x = x.trim()
+      pid = x.split(' ')[1]
+      pids.push pid
+
+    pids = _.uniq pids
+
+    if pids
+        await exec "kill -9 " + pids.join(' '), {silent:yes,async:yes}, defer killed
+
+    return cb null, false
 
   fork: ->
     if @child
       @child.removeAllListeners 'exit'
-      await exec "kill #{@child.pid}", {silent:yes}, defer killed
+      await exec "kill -9 #{@child.pid}", {silent:yes,async:yes}, defer killed
+      await @kill defer()
 
     @waiting = no
 
@@ -50,7 +74,8 @@ module.exports = runfast =
     @child.on 'exit', =>
       if !@waiting
         @waiting = yes
-        await exec "kill #{@child.pid}", {silent:yes}, defer killed
+        await exec "kill -9 #{@child.pid}", {silent:yes,async:yes}, defer killed
+        await @kill defer()
         try
           exec """play ~/beep.mp3""", {async:yes,silent:yes}
         log "(waiting)".blue
@@ -60,8 +85,12 @@ module.exports = runfast =
       valid = ['coffee','js','iced']
       extension = filename.split('.').pop()
       if extension in valid
+        return if new Date().getTime() - LAST_FORK < 1000
+        LAST_FORK = new Date().getTime()
         return @fork()
     )
+
+    throttled_handler = _.throttle(_handler,1000)
 
     fs.watch shelljs.pwd(), _handler
 
